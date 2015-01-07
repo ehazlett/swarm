@@ -5,9 +5,12 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io/ioutil"
+	"net/url"
+	"path/filepath"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
+	"github.com/docker/libtrust"
 	"github.com/docker/swarm/api"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/discovery"
@@ -59,19 +62,62 @@ func manage(c *cli.Context) {
 		err       error
 	)
 
-	// If either --tls or --tlsverify are specified, load the certificates.
-	if c.Bool("tls") || c.Bool("tlsverify") {
-		tlsConfig, err = loadTlsConfig(
-			c.String("tlscacert"),
-			c.String("tlscert"),
-			c.String("tlskey"),
-			c.Bool("tlsverify"))
+	trustUnknownHosts := c.Bool("trustunknownhosts")
+	authType := c.String("authtype")
+	rootConfigDir := c.String("rootconfigdir")
+
+	// check for auth type (cert/identity)
+	switch authType {
+	case "identity":
+		log.Debugf("Loading keys for identity from %s", rootConfigDir)
+		trustKeyPath := filepath.Join(rootConfigDir, "key.json")
+		trustKey, err := libtrust.LoadOrCreateTrustKey(trustKeyPath)
 		if err != nil {
 			log.Fatal(err)
 		}
+
+		hosts := c.StringSlice("host")
+		// TODO: parse multiple
+		u, err := url.Parse(hosts[0])
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		addr := u.Host
+		trustKeysDir := filepath.Join(rootConfigDir, "authorized-keys.d")
+
+		manager, err := libtrust.NewClientKeyManager(trustKey, "", trustKeysDir)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		if tlsConfig, err = libtrust.NewIdentityAuthTLSConfig(trustKey, manager, addr); err != nil {
+			log.Fatal(err)
+		}
+		if c.Bool("trustunknownhosts") {
+			tlsConfig.InsecureSkipVerify = true
+		}
+		tlsConfig.ClientAuth = tls.NoClientCert
+
+	case "cert":
+		// If either --tls or --tlsverify are specified, load the certificates.
+		if c.Bool("tls") || c.Bool("tlsverify") {
+			tlsConfig, err = loadTlsConfig(
+				c.String("tlscacert"),
+				c.String("tlscert"),
+				c.String("tlskey"),
+				c.Bool("tlsverify"))
+			if err != nil {
+				log.Fatal(err)
+			}
+		}
+
+	default:
+		tlsConfig = nil
+
 	}
 
-	cluster := cluster.NewCluster(tlsConfig)
+	cluster := cluster.NewCluster(tlsConfig, authType, trustUnknownHosts, rootConfigDir)
 	cluster.Events(&logHandler{})
 
 	go func() {

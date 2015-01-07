@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/docker/libtrust"
 	"github.com/docker/swarm/discovery"
 )
 
@@ -17,15 +18,20 @@ var (
 
 type Cluster struct {
 	sync.RWMutex
-	tlsConfig     *tls.Config
-	eventHandlers []EventHandler
-	nodes         map[string]*Node
+	authType          string
+	trustUnknownHosts bool
+	rootConfigPath    string
+	tlsConfig         *tls.Config
+	eventHandlers     []EventHandler
+	nodes             map[string]*Node
 }
 
-func NewCluster(tlsConfig *tls.Config) *Cluster {
+func NewCluster(tlsConfig *tls.Config, authType string, trustUnknownHosts bool, rootConfigPath string) *Cluster {
 	return &Cluster{
-		tlsConfig: tlsConfig,
-		nodes:     make(map[string]*Node),
+		tlsConfig:      tlsConfig,
+		nodes:          make(map[string]*Node),
+		authType:       authType,
+		rootConfigPath: rootConfigPath,
 	}
 }
 
@@ -61,7 +67,15 @@ func (c *Cluster) UpdateNodes(nodes []*discovery.Node) {
 		go func(node *discovery.Node) {
 			if c.Node(node.String()) == nil {
 				n := NewNode(node.String())
-				if err := n.Connect(c.tlsConfig); err != nil {
+				tlsConfig := c.tlsConfig
+				if c.authType == "identity" {
+					cfg, err := libtrust.NewIdentityAuthTLSClientConfig(n.Addr, c.trustUnknownHosts, c.rootConfigPath)
+					if err != nil {
+						log.Error(err)
+					}
+					tlsConfig = cfg
+				}
+				if err := n.Connect(tlsConfig); err != nil {
 					log.Error(err)
 					return
 				}

@@ -86,7 +86,8 @@ func main() {
 				flStrategy, flFilter,
 				flDiscovery, flHosts, flHeartBeat,
 				flTls, flTlsCaCert, flTlsCert, flTlsKey, flTlsVerify,
-				flEnableCors},
+				flEnableCors, flAuthType, flTrustUnknownHosts,
+				flRootConfigDir},
 			Action: manage,
 		},
 		{

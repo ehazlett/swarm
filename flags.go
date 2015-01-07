@@ -1,6 +1,10 @@
 package main
 
-import "github.com/codegangsta/cli"
+import (
+	"path/filepath"
+
+	"github.com/codegangsta/cli"
+)
 
 var (
 	flDiscovery = cli.StringFlag{
@@ -59,5 +63,22 @@ var (
 		Name:  "filter, f",
 		Usage: "Filter to use [constraint, health, port]",
 		Value: &cli.StringSlice{"constraint", "health", "port"},
+	}
+	flAuthType = cli.StringFlag{
+		Name:   "authtype",
+		Value:  "",
+		Usage:  "auth type (cert, identity)",
+		EnvVar: "SWARM_AUTH_TYPE",
+	}
+	flTrustUnknownHosts = cli.BoolFlag{
+		Name:   "trustunknownhosts",
+		Usage:  "trust unknown hosts (identity auth)",
+		EnvVar: "SWARM_TRUST_UNKNOWN_HOSTS",
+	}
+	flRootConfigDir = cli.StringFlag{
+		Name:   "rootconfigdir",
+		Value:  filepath.Join(GetHomeDir(), ".swarm"),
+		Usage:  "root config directory for use with authentication",
+		EnvVar: "SWARM_ROOT_CONFIG_DIR",
 	}
 )
