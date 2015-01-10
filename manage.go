@@ -97,7 +97,7 @@ func manage(c *cli.Context) {
 		if c.Bool("trustunknownhosts") {
 			tlsConfig.InsecureSkipVerify = true
 		}
-		tlsConfig.ClientAuth = tls.NoClientCert
+		tlsConfig.ClientAuth = tls.RequireAnyClientCert
 
 	case "cert":
 		// If either --tls or --tlsverify are specified, load the certificates.
