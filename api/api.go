@@ -36,16 +36,24 @@ type handler func(c *context, w http.ResponseWriter, r *http.Request)
 
 // GET /info
 func getInfo(c *context, w http.ResponseWriter, r *http.Request) {
+	clusterInfo := c.cluster.ClusterInfo()
+
 	info := struct {
 		Containers      int
 		DriverStatus    [][2]string
 		NEventsListener int
 		Debug           bool
+		Cpus            int64
+		Memory          int64
+		Images          int64
 	}{
 		len(c.cluster.Containers()),
 		c.cluster.Info(),
 		c.eventsHandler.Size(),
 		c.debug,
+		clusterInfo.Cpus,
+		clusterInfo.Memory,
+		clusterInfo.Images,
 	}
 
 	w.Header().Set("Content-Type", "application/json")

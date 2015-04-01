@@ -2,6 +2,13 @@ package cluster
 
 import "github.com/samalba/dockerclient"
 
+type ClusterInfo struct {
+	Cpus       int64
+	Memory     int64
+	Containers int64
+	Images     int64
+}
+
 // Cluster is exported
 type Cluster interface {
 	// Create a container
@@ -34,4 +41,7 @@ type Cluster interface {
 	// Return some info about the cluster, like nb or containers / images
 	// It is pretty open, so the implementation decides what to return.
 	Info() [][2]string
+
+	// Clusterinfo returns specific information like cluster cpus or memory
+	ClusterInfo() *ClusterInfo
 }

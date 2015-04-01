@@ -298,3 +298,23 @@ func (c *Cluster) Info() [][2]string {
 
 	return info
 }
+
+func (c *Cluster) ClusterInfo() *cluster.ClusterInfo {
+	cpus := int64(0)
+	memory := int64(0)
+	containers := int64(0)
+	images := int64(len(c.Images()))
+
+	for _, node := range c.nodes {
+		cpus += node.Cpus
+		memory += node.Memory
+		containers += int64(len(node.Containers()))
+	}
+
+	return &cluster.ClusterInfo{
+		Cpus:       cpus,
+		Memory:     memory,
+		Containers: containers,
+		Images:     images,
+	}
+}
