@@ -78,7 +78,7 @@ func clusterRun(c *cli.Context) {
 	}
 
 	// start discover
-	discoverConfig := &libdiscover.DiscoverConfig{
+	discoverConfig := &libdiscover.Config{
 		Name:              c.String("cluster-node-name"),
 		BindAddr:          c.String("cluster-bind-addr"),
 		BindPort:          c.Int("cluster-bind-port"),

@@ -45,7 +45,7 @@ type Cluster struct {
 }
 
 // NewCluster is exported
-func NewCluster(scheduler *scheduler.Scheduler, TLSConfig *tls.Config, discoverConfig *libdiscover.DiscoverConfig, options cluster.DriverOpts, engineAddr string) (cluster.Cluster, error) {
+func NewCluster(scheduler *scheduler.Scheduler, TLSConfig *tls.Config, discoverConfig *libdiscover.Config, options cluster.DriverOpts, engineAddr string) (cluster.Cluster, error) {
 	log.WithFields(log.Fields{"name": "swarm"}).Debug("Initializing cluster")
 
 	cl := &Cluster{
