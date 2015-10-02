@@ -87,4 +87,7 @@ type Cluster interface {
 
 	// TagImage tag an image
 	TagImage(IDOrName string, repo string, tag string, force bool) error
+
+	// Stop stops the cluster
+	Stop() error
 }

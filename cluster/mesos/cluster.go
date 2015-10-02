@@ -568,3 +568,7 @@ func (c *Cluster) BuildImage(buildImage *dockerclient.BuildImage, out io.Writer)
 func (c *Cluster) TagImage(IDOrName string, repo string, tag string, force bool) error {
 	return errNotSupported
 }
+
+func (c *Cluster) Stop() error {
+	return errNotSupported
+}

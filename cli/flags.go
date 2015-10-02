@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -10,6 +12,32 @@ import (
 	"github.com/docker/swarm/scheduler/filter"
 	"github.com/docker/swarm/scheduler/strategy"
 )
+
+func getLocalIP() string {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return "127.0.0.1"
+	}
+
+	addr := "127.0.0.1"
+	// automatically pick the second interface
+	if len(addrs) > 1 {
+		a := addrs[1].String()
+		ipnet := strings.Split(a, "/")
+		addr = ipnet[0]
+	}
+
+	return addr
+}
+
+func getHostname() string {
+	hostname, err := os.Hostname()
+	if err != nil {
+		return "unknown"
+	}
+
+	return hostname
+}
 
 func homepath(p string) string {
 	home := os.Getenv("HOME")
@@ -38,13 +66,67 @@ var (
 		EnvVar: "SWARM_ADVERTISE",
 	}
 	// hack for go vet
-	flHostsValue = cli.StringSlice([]string{"tcp://127.0.0.1:2375"})
+	flHostsValue = cli.StringSlice([]string{"tcp://128.0.0.1:2375"})
 
 	flHosts = cli.StringSliceFlag{
 		Name:   "host, H",
 		Value:  &flHostsValue,
 		Usage:  "ip/socket to listen on",
 		EnvVar: "SWARM_HOST",
+	}
+	flClusterNodeName = cli.StringFlag{
+		Name:  "cluster-node-name",
+		Usage: "name of node in cluster",
+		Value: getHostname(),
+	}
+	flClusterEngineAddr = cli.StringFlag{
+		Name:  "cluster-engine-addr",
+		Usage: "address to the docker engine",
+		Value: "127.0.0.1:2375",
+	}
+	flClusterBindAddr = cli.StringFlag{
+		Name:  "cluster-bind-addr",
+		Usage: "bind address",
+		Value: "0.0.0.0",
+	}
+	flClusterBindPort = cli.IntFlag{
+		Name:  "cluster-bind-port",
+		Usage: "bind port",
+		Value: 7946,
+	}
+	flClusterAdvertiseAddr = cli.StringFlag{
+		Name:  "cluster-advertise-addr",
+		Usage: "advertise address",
+		Value: getLocalIP(),
+	}
+	flClusterAdvertisePort = cli.IntFlag{
+		Name:  "cluster-advertise-port",
+		Usage: "advertise port",
+		Value: 7946,
+	}
+	flClusterRaftBindAddr = cli.StringFlag{
+		Name:  "cluster-raft-bind-addr",
+		Usage: "raft bind address",
+		Value: "0.0.0.0:8746",
+	}
+	flClusterRaftAdvertiseAddr = cli.StringFlag{
+		Name:  "cluster-raft-advertise-addr",
+		Usage: "raft advertise address",
+		Value: fmt.Sprintf("%s:8746", getLocalIP()),
+	}
+	flClusterStorePath = cli.StringFlag{
+		Name:  "cluster-store-path",
+		Usage: "cluster storage path",
+		Value: filepath.Join(os.TempDir(), "grid"),
+	}
+	flClusterJoin = cli.StringFlag{
+		Name:  "cluster-join",
+		Usage: "join an existing cluster",
+		Value: "",
+	}
+	flClusterDebug = cli.BoolFlag{
+		Name:  "cluster-debug",
+		Usage: "enable debug logging for cluster",
 	}
 	flHeartBeat = cli.StringFlag{
 		Name:  "heartbeat",

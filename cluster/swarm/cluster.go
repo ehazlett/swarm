@@ -5,18 +5,23 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/boltdb/bolt"
 	dockerfilters "github.com/docker/docker/pkg/parsers/filters"
 	"github.com/docker/docker/pkg/stringid"
 	"github.com/docker/docker/pkg/units"
 	"github.com/docker/swarm/cluster"
-	"github.com/docker/swarm/discovery"
 	"github.com/docker/swarm/scheduler"
 	"github.com/docker/swarm/scheduler/node"
+	"github.com/ehazlett/libdiscover"
+	"github.com/hashicorp/serf/serf"
 	"github.com/samalba/dockerclient"
 )
 
@@ -24,35 +29,114 @@ import (
 type Cluster struct {
 	sync.RWMutex
 
-	eventHandler cluster.EventHandler
-	engines      map[string]*cluster.Engine
-	scheduler    *scheduler.Scheduler
-	discovery    discovery.Discovery
+	eventHandler  cluster.EventHandler
+	engines       map[string]*cluster.Engine
+	scheduler     *scheduler.Scheduler
+	discover      *libdiscover.Discover
+	eventHandlers map[string]func(e serf.Event) error
+	clusterStore  *bolt.DB
+	ready         bool
+	debug         bool
+
+	engineAddr string
 
 	overcommitRatio float64
 	TLSConfig       *tls.Config
 }
 
 // NewCluster is exported
-func NewCluster(scheduler *scheduler.Scheduler, TLSConfig *tls.Config, discovery discovery.Discovery, options cluster.DriverOpts) (cluster.Cluster, error) {
+func NewCluster(scheduler *scheduler.Scheduler, TLSConfig *tls.Config, discoverConfig *libdiscover.DiscoverConfig, options cluster.DriverOpts, engineAddr string) (cluster.Cluster, error) {
 	log.WithFields(log.Fields{"name": "swarm"}).Debug("Initializing cluster")
 
-	cluster := &Cluster{
+	cl := &Cluster{
 		engines:         make(map[string]*cluster.Engine),
+		engineAddr:      engineAddr,
 		scheduler:       scheduler,
 		TLSConfig:       TLSConfig,
-		discovery:       discovery,
+		ready:           false,
+		debug:           discoverConfig.Debug,
 		overcommitRatio: 0.05,
 	}
 
+	errCh := make(chan error)
+	go func() {
+		err := <-errCh
+		log.Error(err)
+	}()
+
 	if val, ok := options.Float("swarm.overcommit", ""); ok {
-		cluster.overcommitRatio = val
+		cl.overcommitRatio = val
 	}
 
-	discoveryCh, errCh := cluster.discovery.Watch(nil)
-	go cluster.monitorDiscovery(discoveryCh, errCh)
+	// configure cluster storage
+	storePath := discoverConfig.StorePath
+	if err := os.MkdirAll(storePath, 0700); err != nil {
+		return nil, err
+	}
+	clusterStorageDBPath := filepath.Join(storePath, "cluster.db")
+	boltStore, err := bolt.Open(clusterStorageDBPath, 0600, nil)
+	if err != nil {
+		return nil, err
+	}
 
-	return cluster, nil
+	cl.clusterStore = boltStore
+
+	fsm := cluster.SwarmFSM{
+		Store: cl.clusterStore,
+	}
+
+	discover, err := libdiscover.NewDiscover(discoverConfig, fsm)
+	if err != nil {
+		return nil, err
+	}
+
+	discover.SetHandlers(cl.handlers(), errCh)
+
+	cl.discover = discover
+
+	if err := cl.discover.Run(); err != nil {
+		return nil, err
+	}
+
+	// if bootstrap node, add self to cluster to init
+	log.Debugf("members: %d", len(cl.discover.Members()))
+	if len(cl.discover.Members()) == 1 {
+		// wait for initial replication
+		time.Sleep(time.Second * 2)
+
+		log.Debug("sending initial bootstrap engine-join event")
+		if err := cl.discover.SendEvent("engine-join", []byte(cl.engineAddr)); err != nil {
+			return nil, err
+		}
+	}
+
+	cl.ready = true
+
+	if cl.debug {
+		t := time.NewTicker(time.Second * 1)
+		go func() {
+			for _ = range t.C {
+				// debug
+			}
+		}()
+	}
+
+	return cl, nil
+}
+
+func (c *Cluster) Stop() error {
+	if err := c.discover.Stop(); err != nil {
+		return err
+	}
+
+	// wait for replication
+	time.Sleep(time.Second * 1)
+
+	return nil
+}
+
+func (c *Cluster) IsReady() bool {
+	return c.ready
 }
 
 // Handle callbacks for the events
@@ -209,33 +293,33 @@ func (c *Cluster) removeEngine(addr string) bool {
 	return true
 }
 
-// Entries are Docker Engines
-func (c *Cluster) monitorDiscovery(ch <-chan discovery.Entries, errCh <-chan error) {
-	// Watch changes on the discovery channel.
-	currentEntries := discovery.Entries{}
-	for {
-		select {
-		case entries := <-ch:
-			added, removed := currentEntries.Diff(entries)
-			currentEntries = entries
-
-			// Remove engines first. `addEngine` will refuse to add an engine
-			// if there's already an engine with the same ID.  If an engine
-			// changes address, we have to first remove it then add it back.
-			for _, entry := range removed {
-				c.removeEngine(entry.String())
-			}
-
-			// Since `addEngine` can be very slow (it has to connect to the
-			// engine), we are going to do the adds in parallel.
-			for _, entry := range added {
-				go c.addEngine(entry.String())
-			}
-		case err := <-errCh:
-			log.Errorf("Discovery error: %v", err)
-		}
-	}
-}
+//// Entries are Docker Engines
+//func (c *Cluster) monitorDiscovery(ch <-chan discovery.Entries, errCh <-chan error) {
+//	// Watch changes on the discovery channel.
+//	currentEntries := discovery.Entries{}
+//	for {
+//		select {
+//		case entries := <-ch:
+//			added, removed := currentEntries.Diff(entries)
+//			currentEntries = entries
+//
+//			// Remove engines first. `addEngine` will refuse to add an engine
+//			// if there's already an engine with the same ID.  If an engine
+//			// changes address, we have to first remove it then add it back.
+//			for _, entry := range removed {
+//				c.removeEngine(entry.String())
+//			}
+//
+//			// Since `addEngine` can be very slow (it has to connect to the
+//			// engine), we are going to do the adds in parallel.
+//			for _, entry := range added {
+//				go c.addEngine(entry.String())
+//			}
+//		case err := <-errCh:
+//			log.Errorf("Discovery error: %v", err)
+//		}
+//	}
+//}
 
 // Images returns all the images in the cluster.
 func (c *Cluster) Images(all bool, filters dockerfilters.Args) []*cluster.Image {
@@ -718,4 +802,49 @@ func (c *Cluster) TagImage(IDOrName string, repo string, tag string, force bool)
 	}
 
 	return err
+}
+
+func (c *Cluster) syncEngines() error {
+	log.Debug("syncing engine state")
+	nodes := map[string]bool{}
+
+	err := c.clusterStore.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(cluster.BucketNodes))
+		b.ForEach(func(k, v []byte) error {
+			nodes[string(k)] = true
+			return nil
+		})
+
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	engs := map[string]bool{}
+
+	for _, eng := range c.engines {
+		engs[eng.Addr] = true
+	}
+
+	log.Debug(nodes)
+	log.Debug(engs)
+
+	// add nodes
+	for k, _ := range nodes {
+		if _, ok := engs[k]; !ok {
+			log.Debugf("adding engine: addr=%s", k)
+			c.addEngine(k)
+		}
+	}
+
+	// remove nodes
+	for k, _ := range engs {
+		if _, ok := nodes[k]; !ok {
+			log.Debugf("removing engine: addr=%s", k)
+			//c.removeEngine(k)
+		}
+	}
+
+	return nil
 }
