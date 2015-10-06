@@ -38,5 +38,10 @@ var (
 			Flags:     []cli.Flag{flJoinAdvertise, flHeartBeat, flTTL},
 			Action:    join,
 		},
+		{
+			Name:   "spec",
+			Usage:  "generate a stub spec",
+			Action: spec,
+		},
 	}
 )

@@ -697,6 +697,17 @@ func (e *Engine) RenameContainer(container *Container, newName string) error {
 	return err
 }
 
+// StartContainer starts a previously created container
+func (e *Engine) StartContainer(id string, config *dockerclient.HostConfig) error {
+	err := e.client.StartContainer(id, config)
+	if err != nil {
+		return err
+	}
+
+	_, err = e.refreshContainer(id, true)
+	return err
+}
+
 // BuildImage build an image
 func (e *Engine) BuildImage(buildImage *dockerclient.BuildImage) (io.ReadCloser, error) {
 

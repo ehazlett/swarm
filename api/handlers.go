@@ -16,6 +16,7 @@ import (
 
 	dockerfilters "github.com/docker/docker/pkg/parsers/filters"
 	"github.com/docker/swarm/cluster"
+	"github.com/docker/swarm/config"
 	"github.com/docker/swarm/version"
 	"github.com/gorilla/mux"
 	"github.com/samalba/dockerclient"
@@ -362,6 +363,26 @@ func getContainerJSON(c *context, w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(data)
+}
+
+// POST /services/create
+func postServicesCreate(c *context, w http.ResponseWriter, r *http.Request) {
+	var (
+		config *config.Service
+	)
+
+	if err := json.NewDecoder(r.Body).Decode(&config); err != nil {
+		httpError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if err := c.cluster.CreateService(config); err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	//w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
 }
 
 // POST /containers/create

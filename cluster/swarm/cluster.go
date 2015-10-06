@@ -14,6 +14,7 @@ import (
 	"github.com/docker/docker/pkg/stringid"
 	"github.com/docker/docker/pkg/units"
 	"github.com/docker/swarm/cluster"
+	"github.com/docker/swarm/config"
 	"github.com/docker/swarm/discovery"
 	"github.com/docker/swarm/scheduler"
 	"github.com/docker/swarm/scheduler/node"
@@ -83,6 +84,77 @@ func (c *Cluster) generateUniqueID() string {
 			return id
 		}
 	}
+}
+
+// CreateService creates a new service
+func (c *Cluster) CreateService(config *config.Service) error {
+	// TODO: volumes
+	for _, v := range config.Volumes {
+		req := &dockerclient.VolumeCreateRequest{
+			Name:       v.Name,
+			Driver:     v.Driver,
+			DriverOpts: v.DriverOpts,
+		}
+
+		v, err := c.CreateVolume(req)
+		if err != nil {
+			return err
+		}
+
+		log.Debugf("volume created: name=%s engine=%s", v.Name, v.Engine.Name)
+	}
+
+	// TODO: networks
+	for _, n := range config.Networks {
+		log.Debugf("ensuring presence of network: name=%s type=%s", n.Name, n.Type)
+	}
+
+	// TODO: pods
+	for i := int64(0); i < config.Instances; i++ {
+		log.Debugf("creating instance: #=%d", i)
+		if err := c.createPods(config); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (c *Cluster) createPods(service *config.Service) error {
+	for _, p := range service.Pods {
+		if err := c.createPod(service.Name, p); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (c *Cluster) createPod(serviceName string, pod config.Pod) error {
+	// TODO: ensure containers all have the same volumes and networks as the pod
+	// launch containers
+	for _, cnt := range pod.Containers {
+		log.Debugf("launching pod container: image=%s pod=%s", cnt.Config.Image, pod.Name)
+		if cnt.Config.Labels == nil {
+			cnt.Config.Labels = map[string]string{}
+		}
+		cnt.Config.Labels["com.docker.service.name"] = serviceName
+		cnt.Config.Labels["com.docker.pod.name"] = pod.Name
+		cfg := &cluster.ContainerConfig{
+			*cnt.Config,
+		}
+
+		ct, err := c.CreateContainer(cfg, "")
+		if err != nil {
+			return err
+		}
+
+		if err := ct.Engine.StartContainer(ct.Id, &ct.Config.HostConfig); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // CreateContainer aka schedule a brand new container into the cluster.

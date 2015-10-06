@@ -4,11 +4,15 @@ import (
 	"io"
 
 	dockerfilters "github.com/docker/docker/pkg/parsers/filters"
+	"github.com/docker/swarm/config"
 	"github.com/samalba/dockerclient"
 )
 
 // Cluster is exported
 type Cluster interface {
+	// Create a service
+	CreateService(config *config.Service) error
+
 	// Create a container
 	CreateContainer(config *ContainerConfig, name string) (*Container, error)
 

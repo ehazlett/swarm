@@ -15,6 +15,7 @@ import (
 	dockerfilters "github.com/docker/docker/pkg/parsers/filters"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/mesos/queue"
+	"github.com/docker/swarm/config"
 	"github.com/docker/swarm/scheduler"
 	"github.com/docker/swarm/scheduler/node"
 	"github.com/docker/swarm/scheduler/strategy"
@@ -156,6 +157,11 @@ func (c *Cluster) RegisterEventHandler(h cluster.EventHandler) error {
 	}
 	c.eventHandler = h
 	return nil
+}
+
+// CreateService
+func (c *Cluster) CreateService(config *config.Service) error {
+	return errNotSupported
 }
 
 // CreateContainer for container creation in Mesos task
