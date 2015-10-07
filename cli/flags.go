@@ -82,42 +82,32 @@ var (
 	flClusterEngineAddr = cli.StringFlag{
 		Name:  "cluster-engine-addr",
 		Usage: "address to the docker engine",
-		Value: "127.0.0.1:2375",
+		Value: fmt.Sprintf("%s:2375", getLocalIP()),
 	}
 	flClusterBindAddr = cli.StringFlag{
 		Name:  "cluster-bind-addr",
 		Usage: "bind address",
-		Value: "0.0.0.0",
-	}
-	flClusterBindPort = cli.IntFlag{
-		Name:  "cluster-bind-port",
-		Usage: "bind port",
-		Value: 7946,
+		Value: fmt.Sprintf("%s:7946", getLocalIP()),
 	}
 	flClusterAdvertiseAddr = cli.StringFlag{
 		Name:  "cluster-advertise-addr",
 		Usage: "advertise address",
-		Value: getLocalIP(),
-	}
-	flClusterAdvertisePort = cli.IntFlag{
-		Name:  "cluster-advertise-port",
-		Usage: "advertise port",
-		Value: 7946,
+		Value: fmt.Sprintf("%s:7946", getLocalIP()),
 	}
 	flClusterRaftBindAddr = cli.StringFlag{
 		Name:  "cluster-raft-bind-addr",
 		Usage: "raft bind address",
-		Value: "0.0.0.0:8746",
+		Value: fmt.Sprintf("%s:8946", getLocalIP()),
 	}
 	flClusterRaftAdvertiseAddr = cli.StringFlag{
 		Name:  "cluster-raft-advertise-addr",
 		Usage: "raft advertise address",
-		Value: fmt.Sprintf("%s:8746", getLocalIP()),
+		Value: fmt.Sprintf("%s:8946", getLocalIP()),
 	}
 	flClusterStorePath = cli.StringFlag{
 		Name:  "cluster-store-path",
 		Usage: "cluster storage path",
-		Value: filepath.Join(os.TempDir(), "grid"),
+		Value: filepath.Join(os.TempDir(), "swarm"),
 	}
 	flClusterJoin = cli.StringFlag{
 		Name:  "cluster-join",

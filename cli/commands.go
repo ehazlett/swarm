@@ -42,7 +42,7 @@ var (
 			Name:  "cluster",
 			Usage: "Start a Swarm Cluster",
 			Flags: []cli.Flag{
-				flClusterNodeName, flClusterEngineAddr, flClusterBindAddr, flClusterBindPort, flClusterAdvertiseAddr, flClusterAdvertisePort, flClusterRaftBindAddr, flClusterRaftAdvertiseAddr, flClusterStorePath, flClusterJoin, flClusterDebug,
+				flClusterNodeName, flClusterEngineAddr, flClusterBindAddr, flClusterAdvertiseAddr, flClusterRaftBindAddr, flClusterRaftAdvertiseAddr, flClusterStorePath, flClusterJoin, flClusterDebug,
 				flStrategy, flFilter,
 				flHosts,
 				flTLS, flTLSCaCert, flTLSCert, flTLSKey, flTLSVerify,

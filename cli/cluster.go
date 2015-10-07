@@ -2,7 +2,6 @@ package cli
 
 import (
 	"crypto/tls"
-	"net"
 	"os"
 	"os/signal"
 	"syscall"
@@ -72,20 +71,13 @@ func clusterRun(c *cli.Context) {
 		log.Fatal(err)
 	}
 
-	raftAdvAddr, err := net.ResolveTCPAddr("tcp", c.String("cluster-raft-advertise-addr"))
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	// start discover
 	discoverConfig := &libdiscover.Config{
 		Name:              c.String("cluster-node-name"),
 		BindAddr:          c.String("cluster-bind-addr"),
-		BindPort:          c.Int("cluster-bind-port"),
 		AdvertiseAddr:     c.String("cluster-advertise-addr"),
-		AdvertisePort:     c.Int("cluster-advertise-port"),
 		RaftBindAddr:      c.String("cluster-raft-bind-addr"),
-		RaftAdvertiseAddr: raftAdvAddr,
+		RaftAdvertiseAddr: c.String("cluster-raft-advertise-addr"),
 		JoinAddr:          c.String("cluster-join"),
 		StorePath:         c.String("cluster-store-path"),
 		Debug:             c.Bool("cluster-debug"),
