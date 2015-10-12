@@ -110,16 +110,33 @@ func NewCluster(scheduler *scheduler.Scheduler, TLSConfig *tls.Config, discoverC
 		}
 	}
 
-	cl.ready = true
-
 	if cl.debug {
-		t := time.NewTicker(time.Second * 1)
+		t := time.NewTicker(time.Second * 10)
 		go func() {
 			for _ = range t.C {
 				// debug
+				nodes := map[string]bool{}
+
+				err := cl.clusterStore.View(func(tx *bolt.Tx) error {
+					b := tx.Bucket([]byte(cluster.BucketNodes))
+					b.ForEach(func(k, v []byte) error {
+						nodes[string(k)] = true
+						return nil
+					})
+
+					return nil
+				})
+
+				if err != nil {
+					log.Warn(err)
+				}
+
+				log.Debug(nodes)
 			}
 		}()
 	}
+
+	cl.ready = true
 
 	return cl, nil
 }
@@ -837,7 +854,6 @@ func (c *Cluster) syncEngines() error {
 			c.addEngine(k)
 		}
 	}
-
 	// remove nodes
 	for k, _ := range engs {
 		if _, ok := nodes[k]; !ok {

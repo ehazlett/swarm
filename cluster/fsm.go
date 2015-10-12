@@ -44,6 +44,7 @@ func (f SwarmFSM) Apply(l *raft.Log) interface{} {
 		return err
 	}
 
+	// TODO: add/remove nodes to cluster
 	switch cmd.CmdType {
 	case CommandNodeJoin:
 		f.Store.Update(func(tx *bolt.Tx) error {
